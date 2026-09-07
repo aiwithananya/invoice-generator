@@ -1,189 +1,291 @@
-import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
+import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import type { Invoice } from '@/types/invoice';
-import { computeTotals, formatMoney, lineTax, lineTotal } from '@/lib/calc';
+import { computeTotals, formatMoney, lineTax, lineTaxable } from '@/lib/calc';
+import { stateLabel } from '@/lib/states';
 
-// @react-pdf uses its own StyleSheet (a subset of CSS) — this is deliberately
-// separate from the Tailwind on-screen preview so the printed document can be
-// tuned independently. Output is vector: crisp, selectable, small.
+// @react-pdf uses its own StyleSheet (a CSS subset), kept separate from the
+// Tailwind preview so the printed document can be tuned for A4. Output is
+// vector: crisp, selectable, small.
 const styles = StyleSheet.create({
-  page: {
-    padding: 36,
-    fontSize: 10,
-    color: '#1f2937',
-    fontFamily: 'Helvetica',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  brand: { fontSize: 20, fontFamily: 'Helvetica-Bold', color: '#4f46e5' },
-  invoiceMeta: { textAlign: 'right' },
-  metaLabel: { color: '#6b7280', fontSize: 9 },
-  metaValue: { fontFamily: 'Helvetica-Bold', fontSize: 11 },
-  partiesRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 24 },
-  partyBlock: { flex: 1 },
-  partyLabel: {
-    fontSize: 8,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  partyName: { fontFamily: 'Helvetica-Bold', fontSize: 11, marginBottom: 2 },
+  page: { padding: 32, fontSize: 9, color: '#1f2937', fontFamily: 'Helvetica' },
+  row: { flexDirection: 'row' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  logo: { width: 46, height: 46, objectFit: 'contain', marginRight: 8 },
+  sellerName: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: '#111827' },
+  title: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: '#4f46e5', textAlign: 'right' },
   muted: { color: '#4b5563', lineHeight: 1.4 },
-  table: { marginTop: 8 },
+  metaStrip: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 14,
+  },
+  metaCell: { flex: 1 },
+  label: { fontSize: 7, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 },
+  partiesRow: { flexDirection: 'row', gap: 24, marginBottom: 14 },
+  partyBlock: { flex: 1 },
+  partyName: { fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 2 },
   tableHead: {
     flexDirection: 'row',
     backgroundColor: '#4f46e5',
     color: '#ffffff',
-    paddingVertical: 6,
-    paddingHorizontal: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 5,
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9,
+    fontSize: 8,
   },
   tableRow: {
     flexDirection: 'row',
-    paddingVertical: 6,
-    paddingHorizontal: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
   colDesc: { flex: 3 },
-  colHsn: { flex: 1 },
+  colHsn: { flex: 1.2 },
   colNum: { flex: 1, textAlign: 'right' },
-  totalsWrap: { marginTop: 16, alignItems: 'flex-end' },
+  totalsWrap: { marginTop: 12, alignItems: 'flex-end' },
   totalsRow: {
     flexDirection: 'row',
-    width: 220,
+    width: 230,
     justifyContent: 'space-between',
-    paddingVertical: 2,
+    paddingVertical: 1.5,
   },
   totalsLabel: { color: '#4b5563' },
   grandRow: {
     flexDirection: 'row',
-    width: 220,
+    width: 230,
     justifyContent: 'space-between',
-    marginTop: 6,
-    paddingTop: 6,
+    marginTop: 5,
+    paddingTop: 5,
     borderTopWidth: 1,
     borderTopColor: '#111827',
   },
-  grandLabel: { fontFamily: 'Helvetica-Bold', fontSize: 12 },
-  grandValue: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: '#4f46e5' },
-  notes: { marginTop: 28, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
-  footer: {
+  grandLabel: { fontFamily: 'Helvetica-Bold', fontSize: 11 },
+  grandValue: { fontFamily: 'Helvetica-Bold', fontSize: 11, color: '#4f46e5' },
+  words: { marginTop: 8, backgroundColor: '#f1f5f9', borderRadius: 4, padding: 6 },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 10,
+  },
+  signBlock: { alignItems: 'flex-end', justifyContent: 'flex-end' },
+  pageFooter: {
     position: 'absolute',
-    bottom: 24,
-    left: 36,
-    right: 36,
+    bottom: 20,
+    left: 32,
+    right: 32,
     textAlign: 'center',
     color: '#9ca3af',
-    fontSize: 8,
+    fontSize: 7,
   },
 });
 
-function PartyView({ label, party }: { label: string; party: Invoice['seller'] }) {
-  return (
-    <View style={styles.partyBlock}>
-      <Text style={styles.partyLabel}>{label}</Text>
-      <Text style={styles.partyName}>{party.name || '—'}</Text>
-      {party.address ? <Text style={styles.muted}>{party.address}</Text> : null}
-      {party.gstin ? <Text style={styles.muted}>GSTIN: {party.gstin}</Text> : null}
-      {party.state ? <Text style={styles.muted}>{party.state}</Text> : null}
-      {party.email ? <Text style={styles.muted}>{party.email}</Text> : null}
-      {party.phone ? <Text style={styles.muted}>{party.phone}</Text> : null}
-    </View>
-  );
-}
-
 export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
+  const isGst = invoice.invoiceType === 'gst';
   const totals = computeTotals(invoice);
   const money = (n: number) => formatMoney(n, invoice.currency);
+  const seller = invoice.seller;
+  const buyer = invoice.buyer;
+  const bank = seller.bank;
+  const hasBank = Boolean(bank.accountName || bank.accountNumber || bank.ifsc || bank.bankName);
 
   return (
-    <Document title={`Invoice ${invoice.invoiceNumber}`}>
+    <Document title={`${isGst ? 'Tax Invoice' : 'Bill of Supply'} ${invoice.invoiceNumber}`}>
       <Page size="A4" style={styles.page}>
+        {/* Header */}
         <View style={styles.headerRow}>
+          <View style={styles.row}>
+            {seller.logo ? <Image src={seller.logo} style={styles.logo} /> : null}
+            <View>
+              <Text style={styles.sellerName}>{seller.name || 'Your business'}</Text>
+              {seller.address ? <Text style={styles.muted}>{seller.address}</Text> : null}
+              {seller.stateCode ? (
+                <Text style={styles.muted}>{stateLabel(seller.stateCode)}</Text>
+              ) : null}
+              {isGst && seller.gstin ? (
+                <Text style={styles.muted}>GSTIN: {seller.gstin}</Text>
+              ) : null}
+              {seller.pan ? <Text style={styles.muted}>PAN: {seller.pan}</Text> : null}
+            </View>
+          </View>
           <View>
-            <Text style={styles.brand}>INVOICE</Text>
-            <Text style={styles.muted}>{invoice.seller.name || 'Your business'}</Text>
-          </View>
-          <View style={styles.invoiceMeta}>
-            <Text style={styles.metaLabel}>Invoice #</Text>
-            <Text style={styles.metaValue}>{invoice.invoiceNumber}</Text>
-            <Text style={[styles.metaLabel, { marginTop: 6 }]}>Date</Text>
-            <Text style={styles.muted}>{invoice.invoiceDate}</Text>
-            <Text style={[styles.metaLabel, { marginTop: 6 }]}>Due</Text>
-            <Text style={styles.muted}>{invoice.dueDate}</Text>
+            <Text style={styles.title}>{isGst ? 'TAX INVOICE' : 'BILL OF SUPPLY'}</Text>
+            <Text style={[styles.muted, { textAlign: 'right' }]}>#{invoice.invoiceNumber}</Text>
           </View>
         </View>
 
+        {/* Meta strip */}
+        <View style={styles.metaStrip}>
+          <MetaCell label="Invoice date" value={invoice.invoiceDate} />
+          <MetaCell label="Due date" value={invoice.dueDate} />
+          <MetaCell label="Place of supply" value={stateLabel(invoice.placeOfSupplyCode) || '—'} />
+          <MetaCell label="Payment terms" value={invoice.paymentTerms || '—'} />
+        </View>
+
+        {/* Parties */}
         <View style={styles.partiesRow}>
-          <PartyView label="From" party={invoice.seller} />
-          <PartyView label="Bill To" party={invoice.buyer} />
+          <View style={styles.partyBlock}>
+            <Text style={styles.label}>Bill To</Text>
+            <Text style={styles.partyName}>{buyer.name || '—'}</Text>
+            {buyer.address ? <Text style={styles.muted}>{buyer.address}</Text> : null}
+            {buyer.stateCode ? (
+              <Text style={styles.muted}>{stateLabel(buyer.stateCode)}</Text>
+            ) : null}
+            {isGst && !buyer.isUnregistered && buyer.gstin ? (
+              <Text style={styles.muted}>GSTIN: {buyer.gstin}</Text>
+            ) : null}
+            {buyer.isUnregistered ? <Text style={styles.muted}>Unregistered / B2C</Text> : null}
+          </View>
+          <View style={styles.partyBlock}>
+            {buyer.shipToDifferent ? (
+              <>
+                <Text style={styles.label}>Ship To</Text>
+                <Text style={styles.partyName}>{buyer.shipTo.name || '—'}</Text>
+                {buyer.shipTo.address ? (
+                  <Text style={styles.muted}>{buyer.shipTo.address}</Text>
+                ) : null}
+                {buyer.shipTo.stateCode ? (
+                  <Text style={styles.muted}>{stateLabel(buyer.shipTo.stateCode)}</Text>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Text style={styles.label}>Tax type</Text>
+                <Text style={styles.muted}>
+                  {!isGst
+                    ? 'No GST (bill of supply)'
+                    : totals.isIntraState
+                      ? 'Intra-state — CGST + SGST'
+                      : 'Inter-state — IGST'}
+                </Text>
+              </>
+            )}
+          </View>
         </View>
 
-        <View style={styles.table}>
-          <View style={styles.tableHead}>
-            <Text style={styles.colDesc}>Description</Text>
-            <Text style={styles.colHsn}>HSN/SAC</Text>
-            <Text style={styles.colNum}>Qty</Text>
-            <Text style={styles.colNum}>Rate</Text>
-            <Text style={styles.colNum}>GST %</Text>
-            <Text style={styles.colNum}>Amount</Text>
-          </View>
-          {invoice.items.map((item) => (
+        {/* Items table */}
+        <View style={styles.tableHead}>
+          <Text style={styles.colDesc}>Description</Text>
+          <Text style={styles.colHsn}>HSN/SAC</Text>
+          <Text style={styles.colNum}>Qty</Text>
+          <Text style={styles.colNum}>Rate</Text>
+          <Text style={styles.colNum}>Disc</Text>
+          <Text style={styles.colNum}>Taxable</Text>
+          {isGst ? <Text style={styles.colNum}>GST</Text> : null}
+          <Text style={styles.colNum}>Amount</Text>
+        </View>
+        {invoice.items.map((item) => {
+          const tax = lineTax(item, isGst);
+          return (
             <View style={styles.tableRow} key={item.id}>
-              <Text style={styles.colDesc}>{item.description || '—'}</Text>
+              <Text style={styles.colDesc}>
+                {item.description || '—'}
+                {item.unit ? ` / ${item.unit}` : ''}
+              </Text>
               <Text style={styles.colHsn}>{item.hsnSac || '—'}</Text>
               <Text style={styles.colNum}>{item.quantity}</Text>
-              <Text style={styles.colNum}>{money(item.unitPrice)}</Text>
-              <Text style={styles.colNum}>{item.taxRate}%</Text>
-              <Text style={styles.colNum}>{money(lineTotal(item) + lineTax(item))}</Text>
+              <Text style={styles.colNum}>{money(item.rate)}</Text>
+              <Text style={styles.colNum}>{item.discountPct ? `${item.discountPct}%` : '—'}</Text>
+              <Text style={styles.colNum}>{money(lineTaxable(item))}</Text>
+              {isGst ? (
+                <Text style={styles.colNum}>{`${item.gstRate}% (${money(tax)})`}</Text>
+              ) : null}
+              <Text style={styles.colNum}>{money(lineTaxable(item) + tax)}</Text>
             </View>
-          ))}
-        </View>
+          );
+        })}
 
+        {/* Totals */}
         <View style={styles.totalsWrap}>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>Subtotal</Text>
-            <Text>{money(totals.subtotal)}</Text>
-          </View>
-          {invoice.taxMode === 'intra' ? (
+          <TotalsRow label="Subtotal" value={money(totals.subtotal)} />
+          {totals.totalDiscount > 0 ? (
+            <TotalsRow label="Total discount" value={`- ${money(totals.totalDiscount)}`} />
+          ) : null}
+          <TotalsRow label="Taxable value" value={money(totals.taxableValue)} />
+          {isGst && totals.isIntraState ? (
             <>
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>CGST</Text>
-                <Text>{money(totals.cgst)}</Text>
-              </View>
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>SGST</Text>
-                <Text>{money(totals.sgst)}</Text>
-              </View>
+              <TotalsRow label="CGST" value={money(totals.cgst)} />
+              <TotalsRow label="SGST" value={money(totals.sgst)} />
             </>
-          ) : (
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>IGST</Text>
-              <Text>{money(totals.igst)}</Text>
-            </View>
-          )}
+          ) : null}
+          {isGst && !totals.isIntraState ? (
+            <TotalsRow label="IGST" value={money(totals.igst)} />
+          ) : null}
+          {Math.abs(totals.roundOff) >= 0.005 ? (
+            <TotalsRow
+              label="Round off"
+              value={`${totals.roundOff >= 0 ? '+ ' : '- '}${money(Math.abs(totals.roundOff))}`}
+            />
+          ) : null}
           <View style={styles.grandRow}>
-            <Text style={styles.grandLabel}>Total</Text>
+            <Text style={styles.grandLabel}>Grand Total</Text>
             <Text style={styles.grandValue}>{money(totals.grandTotal)}</Text>
           </View>
         </View>
 
-        {invoice.notes ? (
-          <View style={styles.notes}>
-            <Text style={styles.partyLabel}>Notes</Text>
-            <Text style={styles.muted}>{invoice.notes}</Text>
-          </View>
-        ) : null}
+        <View style={styles.words}>
+          <Text style={styles.muted}>
+            <Text style={styles.label}>Amount in words: </Text>
+            {totals.amountInWords}
+          </Text>
+        </View>
 
-        <Text style={styles.footer} fixed>
+        {/* Footer: bank / notes / signatory */}
+        <View style={styles.footerRow}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            {hasBank ? (
+              <View style={{ marginBottom: 6 }}>
+                <Text style={styles.label}>Bank details</Text>
+                {bank.accountName ? <Text style={styles.muted}>{bank.accountName}</Text> : null}
+                {bank.bankName ? <Text style={styles.muted}>{bank.bankName}</Text> : null}
+                {bank.accountNumber ? (
+                  <Text style={styles.muted}>A/C: {bank.accountNumber}</Text>
+                ) : null}
+                {bank.ifsc ? <Text style={styles.muted}>IFSC: {bank.ifsc}</Text> : null}
+              </View>
+            ) : null}
+            {invoice.notes ? (
+              <View>
+                <Text style={styles.label}>Notes</Text>
+                <Text style={styles.muted}>{invoice.notes}</Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.signBlock}>
+            <Text style={styles.muted}>For {seller.name || 'Seller'}</Text>
+            <Text style={[styles.muted, { marginTop: 28 }]}>
+              {invoice.authorizedSignatory || 'Authorized Signatory'}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.pageFooter} fixed>
           Generated with AI with Ananya · Invoice Generator — 100% in your browser.
         </Text>
       </Page>
     </Document>
+  );
+}
+
+function MetaCell({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metaCell}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={{ fontFamily: 'Helvetica-Bold' }}>{value}</Text>
+    </View>
+  );
+}
+
+function TotalsRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.totalsRow}>
+      <Text style={styles.totalsLabel}>{label}</Text>
+      <Text>{value}</Text>
+    </View>
   );
 }

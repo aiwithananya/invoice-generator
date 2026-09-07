@@ -1,7 +1,24 @@
 # AI with Ananya · Invoice Generator
 
-A **free, open-source, 100% browser-only** invoice generator for Indian businesses.
+A **free, open-source, 100% browser-only** GST invoice generator for Indian businesses.
 No backend. No database. No sign-up. **Your invoice data never leaves your device.**
+
+## GST features
+
+- **Tax Invoice** and **Bill of Supply** (non-GST / unregistered / composition) modes.
+- **CGST + SGST vs IGST is derived automatically** from the seller's state and the
+  place of supply (both picked from the 36 GST state codes) — intra-state splits into
+  CGST + SGST, inter-state charges a single IGST.
+- Seller & buyer details: name, address, **GSTIN**, **PAN**, state, email, phone;
+  seller **logo** (base64, in-browser only) and **bank details** (A/C name, number, IFSC).
+- Buyer extras: **Bill-to / Ship-to** toggle and an **Unregistered / B2C** checkbox that
+  drops the GSTIN requirement.
+- Line items: description, **HSN/SAC**, qty, unit, rate, **discount %**, auto-calculated
+  taxable value, and a **0/5/12/18/28** GST-rate dropdown.
+- Totals: subtotal, total discount, taxable value, CGST/SGST/IGST, **round-off**, grand
+  total, and **grand total in words** (Indian lakh/crore system).
+- Notes/terms and an **authorized signatory** line.
+- **Invoice-number auto-increment** (counter kept in `localStorage`, on-device only).
 
 ## Why it's private by design
 

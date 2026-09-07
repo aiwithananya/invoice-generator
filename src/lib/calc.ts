@@ -1,31 +1,77 @@
 import type { Invoice, InvoiceTotals, LineItem } from '@/types/invoice';
+import { amountToWordsINR } from './numberToWords';
 
-export const lineTotal = (item: LineItem): number => item.quantity * item.unitPrice;
+// --- Per-line derivations -------------------------------------------------
 
-export const lineTax = (item: LineItem): number => (lineTotal(item) * item.taxRate) / 100;
+/** Gross before discount. */
+export const lineGross = (item: LineItem): number => (item.quantity || 0) * (item.rate || 0);
+
+export const lineDiscount = (item: LineItem): number =>
+  (lineGross(item) * (item.discountPct || 0)) / 100;
+
+/** Taxable value = gross − discount. GST is charged on this. */
+export const lineTaxable = (item: LineItem): number => lineGross(item) - lineDiscount(item);
+
+/** Tax amount for a line. Zero for a bill of supply. */
+export const lineTax = (item: LineItem, gstApplicable: boolean): number =>
+  gstApplicable ? (lineTaxable(item) * (item.gstRate || 0)) / 100 : 0;
+
+// --- Intra vs inter-state -------------------------------------------------
 
 /**
- * Pure totals calculator. CGST/SGST split for intra-state, single IGST for
- * inter-state — matching how Indian GST invoices present tax.
+ * Intra-state (CGST + SGST) when the seller's state equals the place of supply,
+ * inter-state (IGST) when they differ. If either is unset we can't determine
+ * inter-state, so we default to intra-state.
  */
-export function computeTotals(invoice: Invoice): InvoiceTotals {
-  const subtotal = invoice.items.reduce((sum, item) => sum + lineTotal(item), 0);
-  const totalTax = invoice.items.reduce((sum, item) => sum + lineTax(item), 0);
+export function isIntraState(invoice: Invoice): boolean {
+  const seller = invoice.seller.stateCode;
+  const pos = invoice.placeOfSupplyCode;
+  if (!seller || !pos) return true;
+  return seller === pos;
+}
 
-  const isIntra = invoice.taxMode === 'intra';
-  const cgst = isIntra ? totalTax / 2 : 0;
-  const sgst = isIntra ? totalTax / 2 : 0;
-  const igst = isIntra ? 0 : totalTax;
+// --- Totals ---------------------------------------------------------------
+
+export function computeTotals(invoice: Invoice): InvoiceTotals {
+  const gstApplicable = invoice.invoiceType === 'gst';
+  const intra = isIntraState(invoice);
+
+  let subtotal = 0;
+  let totalDiscount = 0;
+  let taxableValue = 0;
+  let totalTax = 0;
+
+  for (const item of invoice.items) {
+    subtotal += lineGross(item);
+    totalDiscount += lineDiscount(item);
+    taxableValue += lineTaxable(item);
+    totalTax += lineTax(item, gstApplicable);
+  }
+
+  const cgst = gstApplicable && intra ? totalTax / 2 : 0;
+  const sgst = gstApplicable && intra ? totalTax / 2 : 0;
+  const igst = gstApplicable && !intra ? totalTax : 0;
+
+  const preRound = taxableValue + totalTax;
+  const grandTotal = Math.round(preRound);
+  const roundOff = grandTotal - preRound;
 
   return {
     subtotal,
-    totalTax,
+    totalDiscount,
+    taxableValue,
     cgst,
     sgst,
     igst,
-    grandTotal: subtotal + totalTax,
+    totalTax,
+    roundOff,
+    grandTotal,
+    isIntraState: intra,
+    amountInWords: amountToWordsINR(grandTotal),
   };
 }
+
+// --- Formatting -----------------------------------------------------------
 
 const INR_FORMATTER = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -35,10 +81,11 @@ const INR_FORMATTER = new Intl.NumberFormat('en-IN', {
 
 /** Format a number as currency. Defaults to Indian Rupee grouping. */
 export function formatMoney(amount: number, currency = 'INR'): string {
-  if (currency === 'INR') return INR_FORMATTER.format(amount || 0);
+  const value = Number.isFinite(amount) ? amount : 0;
+  if (currency === 'INR') return INR_FORMATTER.format(value);
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
     maximumFractionDigits: 2,
-  }).format(amount || 0);
+  }).format(value);
 }
