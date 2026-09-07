@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "A free, open-source, 100% browser-only invoice generator for Indian businesses. No backend, no data ever leaves your device.",
+  "author": "Ananya Garg",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

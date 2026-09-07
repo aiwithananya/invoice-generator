@@ -1,120 +1,139 @@
 # AI with Ananya · Invoice Generator
 
 A **free, open-source, 100% browser-only** GST invoice generator for Indian businesses.
-No backend. No database. No sign-up. **Your invoice data never leaves your device.**
+Create a professional tax invoice, watch it update live, and download it as a PDF or an
+image — all without your data ever leaving your device.
 
-## GST features
+> **Privacy in one line:** there is no backend, no database, no sign-up, and no tracking.
+> Every invoice you type stays in your browser.
 
-- **Tax Invoice** and **Bill of Supply** (non-GST / unregistered / composition) modes.
-- **CGST + SGST vs IGST is derived automatically** from the seller's state and the
-  place of supply (both picked from the 36 GST state codes) — intra-state splits into
-  CGST + SGST, inter-state charges a single IGST.
-- Seller & buyer details: name, address, **GSTIN**, **PAN**, state, email, phone;
-  seller **logo** (base64, in-browser only) and **bank details** (A/C name, number, IFSC).
-- Buyer extras: **Bill-to / Ship-to** toggle and an **Unregistered / B2C** checkbox that
-  drops the GSTIN requirement.
-- Line items: description, **HSN/SAC**, qty, unit, rate, **discount %**, auto-calculated
-  taxable value, and a **0/5/12/18/28** GST-rate dropdown.
-- Totals: subtotal, total discount, taxable value, CGST/SGST/IGST, **round-off**, grand
-  total, and **grand total in words** (Indian lakh/crore system).
-- Notes/terms and an **authorized signatory** line.
-- **Invoice-number auto-increment** (counter kept in `localStorage`, on-device only).
+## Screenshot
 
-## Why it's private by design
+<!-- Replace with a real screenshot: save one to docs/screenshot.png -->
+![Invoice Generator — form on the left, live preview on the right](docs/screenshot.png)
 
-- **Everything is React state.** Invoice data lives only in memory while you work.
-- **Opt-in local drafts.** The only persistence is an explicit **Save draft** button,
-  which writes to your browser's `localStorage` — on your machine, nowhere else.
-- **PDFs are built in your browser.** `@react-pdf/renderer` renders the invoice to a
-  vector PDF in-memory and triggers a direct download. There is no upload step and no
-  "download link" served from anywhere — the app makes **zero network requests** for
-  your data.
-- **Image export is in-browser too.** "PNG" / "JPG" rasterise the on-screen invoice with
-  `html-to-image` (DOM → canvas → data URL) for easy sharing on WhatsApp — again, no
-  network. Files are auto-named `Invoice_<number>_<buyer>.<ext>`.
-- **No network code, by audit.** The source contains no `fetch`, `axios`, `XMLHttpRequest`,
-  `WebSocket`, `sendBeacon`, or analytics — nothing that could send your data anywhere.
-- **You can wipe everything.** A **Clear all data** button removes every `aiwa.*` key this
-  app stored in `localStorage` (draft, invoice counter, preferences) in one click.
+_Placeholder — drop a screenshot at `docs/screenshot.png` (form on the left, live preview
+on the right)._
 
-## Works offline (installable PWA)
+## What it does
 
-Once the page has loaded once, a service worker precaches the entire app shell — so it
-runs **fully offline** and can be **installed** to your home screen / desktop (look for the
-browser's "Install app" option). Because the app never needed the network for your data in
-the first place, everything — editing, calculations, PDF and image export — keeps working
-with no internet. The service worker only caches the app's own static files; it never
-sends anything out.
+- **GST Tax Invoice** and **Bill of Supply** (non-GST / unregistered / composition) modes.
+- **Automatic CGST + SGST vs IGST** — derived from the seller's state and the place of
+  supply (36 GST state codes built in): same state splits into CGST + SGST, different
+  states charge a single IGST.
+- **Full seller & buyer details** — name, address, GSTIN, PAN, state, email, phone; a
+  seller **logo** and **bank details**; a **Bill-to / Ship-to** toggle and an
+  **Unregistered / B2C** option.
+- **Repeatable line items** — description, HSN/SAC, qty, unit, rate, discount %,
+  auto-calculated taxable value, and a 0/5/12/18/28 GST-rate picker.
+- **Correct totals** — subtotal, discount, taxable value, an HSN-wise **tax summary
+  table**, round-off, grand total, and **grand total in words** (Indian lakh/crore).
+- **Live preview** that recalculates on every keystroke and mirrors the printed layout.
+- **Download** as a vector **PDF** or as a **PNG/JPEG** image (handy for WhatsApp),
+  auto-named `Invoice_<number>_<buyer>.<ext>`.
+- **Inline validation** for GSTIN/PAN format and required fields.
+- **Optional local draft** (Save draft) and invoice-number **auto-increment**, both stored
+  only in your browser.
+- **Installable PWA** that works fully **offline** once loaded.
 
-## Validation
+## Privacy guarantee
 
-Inline, as-you-go checks: **GSTIN** and **PAN** format (regex), required fields, and a
-soft warning when a GSTIN's leading state code doesn't match the selected state. Errors
-appear once a field has a value or after you leave it empty — never a wall of red on load.
+This is the whole point of the project:
 
-## Stack
+- **No backend.** There is no server that receives your data. The app is a set of static
+  files.
+- **No database.** Nothing is stored anywhere except, optionally, your own browser's
+  `localStorage` (only when you click **Save draft** or enable auto-increment).
+- **No tracking, no analytics, no error reporting.** There is no Google Analytics, no
+  Sentry, no telemetry, no cookies, no third-party scripts of any kind.
+- **All processing is local.** Invoice data lives in React state. **PDF generation**
+  (`@react-pdf/renderer`) and **image generation** (`html-to-image`) both run entirely in
+  your browser and hand the file straight to the browser's download — there is no upload
+  and no "download link" served from anywhere.
+- **The code makes zero network requests for your data**, by design and by audit — the
+  source contains no `fetch`, `axios`, `XMLHttpRequest`, `WebSocket`, or `sendBeacon`.
+- **You can wipe everything** with the **Clear all data** button, and the app keeps working
+  with no internet at all.
+
+Don't take our word for it — the source is small and readable, and you can watch the
+Network tab stay empty while you use it.
+
+## Tech stack
 
 - [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
-- [Vite 5](https://vitejs.dev/) (static build — host it anywhere)
+- [Vite 5](https://vitejs.dev/) — static build, host it anywhere
 - [Tailwind CSS 3](https://tailwindcss.com/)
-- [@react-pdf/renderer](https://react-pdf.org/) for vector, print-quality PDFs
-- [html-to-image](https://github.com/bubkoo/html-to-image) for PNG/JPEG export
-- [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) for the offline service worker
+- [@react-pdf/renderer](https://react-pdf.org/) — vector, print-quality PDFs
+- [html-to-image](https://github.com/bubkoo/html-to-image) — PNG/JPEG export
+- [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) — offline service worker + install
 - ESLint + Prettier
 
-## Why `@react-pdf/renderer` and not `jspdf + html2canvas`?
+## Run it locally
 
-`jspdf + html2canvas` rasterises the page into an image — fuzzy text, no selectable
-content, large files, awkward page breaks. `@react-pdf/renderer` builds a real vector
-PDF from a layout engine: crisp, selectable text, small files, and precise control over
-the invoice table. The on-screen preview (`InvoicePreview`) and the PDF document
-(`InvoiceDocument`) are separate implementations that read the same `Invoice` object,
-so each can be tuned for its medium.
-
-## Getting started
+You'll need [Node.js](https://nodejs.org/) 18+.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open the printed local URL.
+Open the URL it prints (usually http://localhost:5173).
 
-### Scripts
+### Other scripts
 
-| Script             | What it does                          |
-| ------------------ | ------------------------------------- |
-| `npm run dev`      | Start the Vite dev server             |
-| `npm run build`    | Type-check and build a static bundle  |
-| `npm run preview`  | Preview the production build          |
-| `npm run lint`     | Run ESLint                            |
-| `npm run format`   | Format with Prettier                  |
+| Script                 | What it does                         |
+| ---------------------- | ------------------------------------ |
+| `npm run dev`          | Start the Vite dev server            |
+| `npm run build`        | Type-check and build to `dist/`      |
+| `npm run preview`      | Preview the production build locally |
+| `npm run lint`         | Run ESLint                           |
+| `npm run format`       | Format with Prettier                 |
 
-## Project structure
+## Deploy your own copy (free)
 
-```
-src/
-  components/
-    InvoiceForm.tsx      # Controlled form — the editing surface
-    InvoicePreview.tsx   # Live on-screen preview (HTML/Tailwind)
-  pdf/
-    InvoiceDocument.tsx  # The @react-pdf document (print layout)
-    downloadPdf.ts       # In-browser render → Blob → download
-  hooks/
-    useLocalStorageDraft.ts  # Opt-in, on-device draft persistence
-  lib/
-    calc.ts              # Pure totals + currency formatting
-    sample.ts            # Starter invoice + id helper
-  types/
-    invoice.ts           # Domain types
-  App.tsx                # Side-by-side shell: Form | Preview
-```
+Because the build output is just static files, you can host it anywhere for free.
 
-## Deploy
+### Option A — GitHub Pages (automated)
 
-`npm run build` produces a fully static `dist/` folder — deploy it to GitHub Pages,
-Netlify, Cloudflare Pages, or any static host. There is nothing to run server-side.
+This repo includes a workflow at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
+that builds and publishes on every push to `main`.
+
+1. Fork or push this repo to your GitHub account.
+2. In your repo: **Settings → Pages → Build and deployment → Source = "GitHub Actions"**.
+3. Push to `main` (or run the workflow from the **Actions** tab).
+
+Your app goes live at `https://<your-username>.github.io/<repo>/`. The workflow sets Vite's
+`base` to `/<repo>/` automatically, so all assets and the service worker resolve correctly
+on the sub-path.
+
+> Using a `username.github.io` user/org repo (served from the domain root)? Set
+> `BASE_PATH` to `/` in the workflow's Build step.
+
+### Option B — Vercel
+
+1. Import the repo at [vercel.com/new](https://vercel.com/new).
+2. Framework preset: **Vite**. Build command `npm run build`, output directory `dist`.
+   (Vercel serves from the domain root, so no `base` change is needed.)
+3. Deploy.
+
+Netlify, Cloudflare Pages, or any static host works the same way: build with `npm run
+build` and serve the `dist/` folder.
+
+## A note on GST compliance
+
+This tool is provided **for convenience** to help you produce good-looking, well-structured
+invoices. It is **not tax or legal advice and not a substitute for a qualified accountant or
+tax professional.** GST rules — rates, HSN/SAC classification, place-of-supply, reverse
+charge, e-invoicing/IRN requirements, and more — change and depend on your specific
+circumstances. Please verify the details and consult an accountant before relying on any
+invoice for filing or compliance. The software is provided "as is", without warranty (see
+[LICENSE](LICENSE)).
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). The one hard rule:
+**it must stay 100% client-side** (no backends, no trackers).
 
 ## License
 
-MIT — do what you like, no warranty.
+[MIT](LICENSE) © Ananya Garg

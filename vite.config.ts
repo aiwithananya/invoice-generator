@@ -4,12 +4,18 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 
 // 100% client-side app — Vite builds a fully static bundle that can be
-// hosted on any static host (GitHub Pages, Netlify, etc.). No server code.
+// hosted on any static host (GitHub Pages, Netlify, Vercel, etc.). No server.
+//
+// GitHub Pages project sites serve from https://<user>.github.io/<repo>/, so the
+// build needs `base` set to that sub-path. The deploy workflow passes it as
+// BASE_PATH; hosts that serve from the domain root (Vercel, Netlify, a user/org
+// GitHub Pages site) need nothing — base defaults to '/'.
 //
 // The PWA plugin adds a service worker that precaches the whole app shell, so
 // once the page has loaded it works fully offline and can be installed. The
 // service worker only caches our own static assets — it never sends data out.
 export default defineConfig({
+  base: process.env.BASE_PATH || '/',
   plugins: [
     react(),
     VitePWA({
@@ -29,8 +35,10 @@ export default defineConfig({
         theme_color: '#4f46e5',
         background_color: '#f1f5f9',
         display: 'standalone',
-        start_url: '/',
-        scope: '/',
+        // Relative so the manifest resolves correctly whether the app is served
+        // from the domain root or a GitHub Pages /<repo>/ sub-path.
+        start_url: '.',
+        scope: '.',
         icons: [
           {
             src: 'icons/icon-192.png',
