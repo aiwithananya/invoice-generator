@@ -32,6 +32,25 @@ No backend. No database. No sign-up. **Your invoice data never leaves your devic
 - **Image export is in-browser too.** "PNG" / "JPG" rasterise the on-screen invoice with
   `html-to-image` (DOM → canvas → data URL) for easy sharing on WhatsApp — again, no
   network. Files are auto-named `Invoice_<number>_<buyer>.<ext>`.
+- **No network code, by audit.** The source contains no `fetch`, `axios`, `XMLHttpRequest`,
+  `WebSocket`, `sendBeacon`, or analytics — nothing that could send your data anywhere.
+- **You can wipe everything.** A **Clear all data** button removes every `aiwa.*` key this
+  app stored in `localStorage` (draft, invoice counter, preferences) in one click.
+
+## Works offline (installable PWA)
+
+Once the page has loaded once, a service worker precaches the entire app shell — so it
+runs **fully offline** and can be **installed** to your home screen / desktop (look for the
+browser's "Install app" option). Because the app never needed the network for your data in
+the first place, everything — editing, calculations, PDF and image export — keeps working
+with no internet. The service worker only caches the app's own static files; it never
+sends anything out.
+
+## Validation
+
+Inline, as-you-go checks: **GSTIN** and **PAN** format (regex), required fields, and a
+soft warning when a GSTIN's leading state code doesn't match the selected state. Errors
+appear once a field has a value or after you leave it empty — never a wall of red on load.
 
 ## Stack
 
@@ -39,6 +58,8 @@ No backend. No database. No sign-up. **Your invoice data never leaves your devic
 - [Vite 5](https://vitejs.dev/) (static build — host it anywhere)
 - [Tailwind CSS 3](https://tailwindcss.com/)
 - [@react-pdf/renderer](https://react-pdf.org/) for vector, print-quality PDFs
+- [html-to-image](https://github.com/bubkoo/html-to-image) for PNG/JPEG export
+- [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) for the offline service worker
 - ESLint + Prettier
 
 ## Why `@react-pdf/renderer` and not `jspdf + html2canvas`?

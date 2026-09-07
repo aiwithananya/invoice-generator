@@ -13,6 +13,7 @@ import { INDIAN_STATES } from '@/lib/states';
 import { lineTaxable } from '@/lib/calc';
 import { fileToDataUrl } from '@/lib/file';
 import { getAutoIncrementPref, nextInvoiceNumber, setAutoIncrementPref } from '@/lib/counter';
+import { validateInvoice } from '@/lib/validation';
 
 interface Props {
   invoice: Invoice;
@@ -31,6 +32,15 @@ const num = (v: string): number => (v === '' ? 0 : Number(v));
  */
 export function InvoiceForm({ invoice, onChange }: Props) {
   const isGst = invoice.invoiceType === 'gst';
+
+  // Field-level validation. Errors surface once a field has a value (so format
+  // mistakes show as you type) or once it's been blurred (so required-but-empty
+  // fields don't shout on first load).
+  const errors = validateInvoice(invoice);
+  const [touched, setTouched] = useState<Set<string>>(() => new Set());
+  const markTouched = (id: string) => setTouched((prev) => new Set(prev).add(id));
+  const errorFor = (id: string, hasValue: boolean): string | undefined =>
+    touched.has(id) || hasValue ? errors[id] : undefined;
 
   const patch = (fields: Partial<Invoice>) => onChange({ ...invoice, ...fields });
 
@@ -70,18 +80,30 @@ export function InvoiceForm({ invoice, onChange }: Props) {
         onChange={(invoiceType) => patch({ invoiceType })}
       />
 
+      {touched.size > 0 && Object.keys(errors).length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {Object.keys(errors).length} field
+          {Object.keys(errors).length > 1 ? 's need' : ' needs'} attention before this invoice is
+          complete.
+        </div>
+      )}
+
       {/* --- Invoice meta --- */}
       <Section title="Invoice details">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <InvoiceNumberField
             value={invoice.invoiceNumber}
             onChange={(invoiceNumber) => patch({ invoiceNumber })}
+            onBlur={() => markTouched('invoiceNumber')}
+            error={errorFor('invoiceNumber', !!invoice.invoiceNumber)}
           />
           <LabeledInput
             label="Invoice date"
             type="date"
             value={invoice.invoiceDate}
             onChange={(v) => patch({ invoiceDate: v })}
+            onBlur={() => markTouched('invoiceDate')}
+            error={errorFor('invoiceDate', !!invoice.invoiceDate)}
           />
           <LabeledInput
             label="Due date"
@@ -93,6 +115,8 @@ export function InvoiceForm({ invoice, onChange }: Props) {
             label="Place of supply"
             value={invoice.placeOfSupplyCode}
             onChange={(placeOfSupplyCode) => patch({ placeOfSupplyCode })}
+            onBlur={() => markTouched('placeOfSupply')}
+            error={errorFor('placeOfSupply', !!invoice.placeOfSupplyCode)}
           />
           <LabeledInput
             label="Payment terms"
@@ -111,6 +135,8 @@ export function InvoiceForm({ invoice, onChange }: Props) {
             label="Business name"
             value={invoice.seller.name}
             onChange={(v) => patchSeller({ name: v })}
+            onBlur={() => markTouched('seller.name')}
+            error={errorFor('seller.name', !!invoice.seller.name)}
           />
           <StateSelect
             label="State"
@@ -130,6 +156,9 @@ export function InvoiceForm({ invoice, onChange }: Props) {
               value={invoice.seller.gstin}
               onChange={(v) => patchSeller({ gstin: v.toUpperCase() })}
               placeholder="15-digit GSTIN"
+              maxLength={15}
+              onBlur={() => markTouched('seller.gstin')}
+              error={errorFor('seller.gstin', !!invoice.seller.gstin)}
             />
           )}
           <LabeledInput
@@ -137,6 +166,9 @@ export function InvoiceForm({ invoice, onChange }: Props) {
             value={invoice.seller.pan}
             onChange={(v) => patchSeller({ pan: v.toUpperCase() })}
             placeholder="10-char PAN"
+            maxLength={10}
+            onBlur={() => markTouched('seller.pan')}
+            error={errorFor('seller.pan', !!invoice.seller.pan)}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -193,6 +225,8 @@ export function InvoiceForm({ invoice, onChange }: Props) {
             label="Name"
             value={invoice.buyer.name}
             onChange={(v) => patchBuyer({ name: v })}
+            onBlur={() => markTouched('buyer.name')}
+            error={errorFor('buyer.name', !!invoice.buyer.name)}
           />
           <StateSelect
             label="State"
@@ -212,12 +246,19 @@ export function InvoiceForm({ invoice, onChange }: Props) {
               value={invoice.buyer.gstin}
               onChange={(v) => patchBuyer({ gstin: v.toUpperCase() })}
               placeholder="15-digit GSTIN"
+              maxLength={15}
+              onBlur={() => markTouched('buyer.gstin')}
+              error={errorFor('buyer.gstin', !!invoice.buyer.gstin)}
             />
           )}
           <LabeledInput
             label="PAN"
             value={invoice.buyer.pan}
             onChange={(v) => patchBuyer({ pan: v.toUpperCase() })}
+            placeholder="10-char PAN"
+            maxLength={10}
+            onBlur={() => markTouched('buyer.pan')}
+            error={errorFor('buyer.pan', !!invoice.buyer.pan)}
           />
           <LabeledInput
             label="Email"
@@ -289,6 +330,7 @@ export function InvoiceForm({ invoice, onChange }: Props) {
             />
           ))}
         </div>
+        {errors['items'] && <p className="mt-2 text-[11px] text-red-600">{errors['items']}</p>}
       </Section>
 
       {/* --- Notes & signatory --- */}
@@ -343,18 +385,21 @@ interface LabeledInputProps extends Omit<
   label: string;
   value: string;
   onChange: (value: string) => void;
+  error?: string;
 }
 
-function LabeledInput({ label, value, onChange, ...rest }: LabeledInputProps) {
+function LabeledInput({ label, value, onChange, error, ...rest }: LabeledInputProps) {
   return (
     <div>
       <label className="field-label">{label}</label>
       <input
-        className="field-input"
+        className={`field-input ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        aria-invalid={error ? true : undefined}
         {...rest}
       />
+      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
     </div>
   );
 }
@@ -363,15 +408,25 @@ function StateSelect({
   label,
   value,
   onChange,
+  onBlur,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (code: string) => void;
+  onBlur?: () => void;
+  error?: string;
 }) {
   return (
     <div>
       <label className="field-label">{label}</label>
-      <select className="field-input" value={value} onChange={(e) => onChange(e.target.value)}>
+      <select
+        className={`field-input ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''}`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        aria-invalid={error ? true : undefined}
+      >
         <option value="">Select state…</option>
         {INDIAN_STATES.map((s) => (
           <option key={s.code} value={s.code}>
@@ -379,6 +434,7 @@ function StateSelect({
           </option>
         ))}
       </select>
+      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
     </div>
   );
 }
@@ -414,7 +470,17 @@ function InvoiceTypeToggle({
   );
 }
 
-function InvoiceNumberField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function InvoiceNumberField({
+  value,
+  onChange,
+  onBlur,
+  error,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  error?: string;
+}) {
   const [autoInc, setAutoInc] = useState<boolean>(() => getAutoIncrementPref());
 
   const toggleAuto = (checked: boolean) => {
@@ -427,7 +493,13 @@ function InvoiceNumberField({ value, onChange }: { value: string; onChange: (v: 
     <div>
       <label className="field-label">Invoice #</label>
       <div className="flex gap-1">
-        <input className="field-input" value={value} onChange={(e) => onChange(e.target.value)} />
+        <input
+          className={`field-input ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          aria-invalid={error ? true : undefined}
+        />
         {autoInc && (
           <button
             type="button"
@@ -448,6 +520,7 @@ function InvoiceNumberField({ value, onChange }: { value: string; onChange: (v: 
         />
         Auto-increment (saved on this device)
       </label>
+      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
     </div>
   );
 }
