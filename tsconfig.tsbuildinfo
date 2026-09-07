@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/invoiceform.tsx","./src/components/invoicepreview.tsx","./src/hooks/uselocalstoragedraft.ts","./src/lib/calc.ts","./src/lib/sample.ts","./src/pdf/invoicedocument.tsx","./src/pdf/downloadpdf.ts","./src/types/invoice.ts"],"version":"5.9.3"}
