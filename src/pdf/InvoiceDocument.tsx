@@ -1,6 +1,6 @@
 import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
-import type { Invoice } from '@/types/invoice';
-import { computeTotals, formatMoney, lineTax, lineTaxable } from '@/lib/calc';
+import type { Invoice, TaxBreakupRow } from '@/types/invoice';
+import { computeTaxBreakup, computeTotals, formatMoney, lineTax, lineTaxable } from '@/lib/calc';
 import { stateLabel } from '@/lib/states';
 
 // @react-pdf uses its own StyleSheet (a CSS subset), kept separate from the
@@ -74,6 +74,43 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   signBlock: { alignItems: 'flex-end', justifyContent: 'flex-end' },
+  summaryTitle: {
+    marginTop: 12,
+    marginBottom: 3,
+    fontSize: 8,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  sumHead: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#cbd5e1',
+    paddingVertical: 4,
+    paddingHorizontal: 5,
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 8,
+    color: '#475569',
+  },
+  sumRow: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    paddingHorizontal: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  sumTotal: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    paddingHorizontal: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#cbd5e1',
+    fontFamily: 'Helvetica-Bold',
+  },
+  sumHsn: { flex: 2, textAlign: 'left' },
+  sumNum: { flex: 1, textAlign: 'right' },
   pageFooter: {
     position: 'absolute',
     bottom: 20,
@@ -88,6 +125,7 @@ const styles = StyleSheet.create({
 export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
   const isGst = invoice.invoiceType === 'gst';
   const totals = computeTotals(invoice);
+  const breakup = computeTaxBreakup(invoice);
   const money = (n: number) => formatMoney(n, invoice.currency);
   const seller = invoice.seller;
   const buyer = invoice.buyer;
@@ -200,6 +238,11 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           );
         })}
 
+        {/* HSN/SAC-wise tax summary */}
+        {isGst && breakup.length > 0 ? (
+          <TaxSummary rows={breakup} intra={totals.isIntraState} money={money} />
+        ) : null}
+
         {/* Totals */}
         <View style={styles.totalsWrap}>
           <TotalsRow label="Subtotal" value={money(totals.subtotal)} />
@@ -286,6 +329,74 @@ function TotalsRow({ label, value }: { label: string; value: string }) {
     <View style={styles.totalsRow}>
       <Text style={styles.totalsLabel}>{label}</Text>
       <Text>{value}</Text>
+    </View>
+  );
+}
+
+function TaxSummary({
+  rows,
+  intra,
+  money,
+}: {
+  rows: TaxBreakupRow[];
+  intra: boolean;
+  money: (n: number) => string;
+}) {
+  const t = rows.reduce(
+    (acc, r) => ({
+      taxable: acc.taxable + r.taxableValue,
+      cgst: acc.cgst + r.cgst,
+      sgst: acc.sgst + r.sgst,
+      igst: acc.igst + r.igst,
+    }),
+    { taxable: 0, cgst: 0, sgst: 0, igst: 0 },
+  );
+  const totalTax = t.cgst + t.sgst + t.igst;
+
+  return (
+    <View wrap={false}>
+      <Text style={styles.summaryTitle}>Tax summary</Text>
+      <View style={styles.sumHead}>
+        <Text style={styles.sumHsn}>HSN/SAC</Text>
+        <Text style={styles.sumNum}>Taxable</Text>
+        {intra ? (
+          <>
+            <Text style={styles.sumNum}>CGST</Text>
+            <Text style={styles.sumNum}>SGST</Text>
+          </>
+        ) : (
+          <Text style={styles.sumNum}>IGST</Text>
+        )}
+        <Text style={styles.sumNum}>Total Tax</Text>
+      </View>
+      {rows.map((r) => (
+        <View style={styles.sumRow} key={`${r.hsnSac}-${r.gstRate}`}>
+          <Text style={styles.sumHsn}>{r.hsnSac}</Text>
+          <Text style={styles.sumNum}>{money(r.taxableValue)}</Text>
+          {intra ? (
+            <>
+              <Text style={styles.sumNum}>{`${r.gstRate / 2}%  ${money(r.cgst)}`}</Text>
+              <Text style={styles.sumNum}>{`${r.gstRate / 2}%  ${money(r.sgst)}`}</Text>
+            </>
+          ) : (
+            <Text style={styles.sumNum}>{`${r.gstRate}%  ${money(r.igst)}`}</Text>
+          )}
+          <Text style={styles.sumNum}>{money(r.cgst + r.sgst + r.igst)}</Text>
+        </View>
+      ))}
+      <View style={styles.sumTotal}>
+        <Text style={styles.sumHsn}>Total</Text>
+        <Text style={styles.sumNum}>{money(t.taxable)}</Text>
+        {intra ? (
+          <>
+            <Text style={styles.sumNum}>{money(t.cgst)}</Text>
+            <Text style={styles.sumNum}>{money(t.sgst)}</Text>
+          </>
+        ) : (
+          <Text style={styles.sumNum}>{money(t.igst)}</Text>
+        )}
+        <Text style={styles.sumNum}>{money(totalTax)}</Text>
+      </View>
     </View>
   );
 }

@@ -1,33 +1,52 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Invoice } from '@/types/invoice';
 import { createEmptyInvoice } from '@/lib/sample';
 import { useLocalStorageDraft } from '@/hooks/useLocalStorageDraft';
 import { downloadInvoicePdf } from '@/pdf/downloadPdf';
+import { downloadNodeAsImage, type ImageFormat } from '@/lib/imageExport';
+import { invoiceFileName } from '@/lib/download';
 import { InvoiceForm } from '@/components/InvoiceForm';
 import { InvoicePreview } from '@/components/InvoicePreview';
 
+type Busy = 'pdf' | ImageFormat | null;
+
 export default function App() {
   const [invoice, setInvoice] = useState<Invoice>(() => createEmptyInvoice());
-  const [downloading, setDownloading] = useState(false);
+  const [busy, setBusy] = useState<Busy>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const { hasSavedDraft, lastSavedAt, saveDraft, loadDraft, clearDraft } = useLocalStorageDraft();
 
-  const handleDownload = async () => {
-    setDownloading(true);
+  const handleDownloadPdf = async () => {
+    setBusy('pdf');
     try {
       await downloadInvoicePdf(invoice);
     } finally {
-      setDownloading(false);
+      setBusy(null);
     }
   };
 
-  const handleSaveDraft = () => {
-    saveDraft(invoice);
+  const handleDownloadImage = async (format: ImageFormat) => {
+    if (!previewRef.current) return;
+    setBusy(format);
+    try {
+      const ext = format === 'jpeg' ? 'jpg' : 'png';
+      await downloadNodeAsImage(previewRef.current, {
+        format,
+        filename: invoiceFileName(invoice.invoiceNumber, invoice.buyer.name, ext),
+      });
+    } finally {
+      setBusy(null);
+    }
   };
+
+  const handleSaveDraft = () => saveDraft(invoice);
 
   const handleLoadDraft = () => {
     const draft = loadDraft();
     if (draft) setInvoice(draft);
   };
+
+  const anyBusy = busy !== null;
 
   return (
     <div className="min-h-screen">
@@ -45,15 +64,36 @@ export default function App() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {hasSavedDraft && (
-              <button className="btn-secondary" onClick={handleLoadDraft}>
+              <button className="btn-secondary" onClick={handleLoadDraft} disabled={anyBusy}>
                 Load draft
               </button>
             )}
-            <button className="btn-secondary" onClick={handleSaveDraft}>
+            <button className="btn-secondary" onClick={handleSaveDraft} disabled={anyBusy}>
               Save draft
             </button>
-            <button className="btn-primary" onClick={handleDownload} disabled={downloading}>
-              {downloading ? 'Preparing…' : 'Download PDF'}
+
+            {/* Image export for WhatsApp / messaging */}
+            <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
+              <button
+                className="bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                onClick={() => handleDownloadImage('png')}
+                disabled={anyBusy}
+                title="Download as PNG image (great for WhatsApp)"
+              >
+                {busy === 'png' ? 'Rendering…' : 'PNG'}
+              </button>
+              <button
+                className="border-l border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                onClick={() => handleDownloadImage('jpeg')}
+                disabled={anyBusy}
+                title="Download as JPEG image (great for WhatsApp)"
+              >
+                {busy === 'jpeg' ? 'Rendering…' : 'JPG'}
+              </button>
+            </div>
+
+            <button className="btn-primary" onClick={handleDownloadPdf} disabled={anyBusy}>
+              {busy === 'pdf' ? 'Preparing…' : 'Download Invoice (PDF)'}
             </button>
           </div>
         </div>
@@ -83,13 +123,13 @@ export default function App() {
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
             Invoice Preview
           </h2>
-          <InvoicePreview invoice={invoice} />
+          <InvoicePreview ref={previewRef} invoice={invoice} />
         </section>
       </main>
 
       <footer className="mx-auto max-w-7xl px-4 py-8 text-center text-xs text-slate-400">
-        No backend. No tracking. No uploads. Built with React + Vite + Tailwind +
-        @react-pdf/renderer.
+        No backend. No tracking. No uploads. PDF via @react-pdf/renderer, images via html-to-image —
+        all in your browser.
       </footer>
     </div>
   );

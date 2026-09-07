@@ -79,6 +79,19 @@ export interface Invoice {
   authorizedSignatory: string;
 }
 
+/**
+ * One row of the HSN/SAC-wise tax summary that a GST tax invoice must carry —
+ * taxable value and CGST/SGST/IGST split, grouped by HSN/SAC and rate.
+ */
+export interface TaxBreakupRow {
+  hsnSac: string;
+  gstRate: number;
+  taxableValue: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+}
+
 /** Derived totals — always computed from the invoice, never stored. */
 export interface InvoiceTotals {
   /** Gross of qty × rate, before any discount. */

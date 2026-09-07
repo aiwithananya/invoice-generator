@@ -1,6 +1,7 @@
 import { pdf, type DocumentProps } from '@react-pdf/renderer';
 import { createElement, type ReactElement } from 'react';
 import type { Invoice } from '@/types/invoice';
+import { invoiceFileName, triggerDownload } from '@/lib/download';
 import { InvoiceDocument } from './InvoiceDocument';
 
 /**
@@ -16,12 +17,7 @@ export async function downloadInvoicePdf(invoice: Invoice): Promise<void> {
   const blob = await pdf(element).toBlob();
   const url = URL.createObjectURL(blob);
 
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${invoice.invoiceNumber || 'invoice'}.pdf`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  triggerDownload(url, invoiceFileName(invoice.invoiceNumber, invoice.buyer.name, 'pdf'));
 
   // Release the object URL on the next tick so the download has a chance to start.
   setTimeout(() => URL.revokeObjectURL(url), 1000);

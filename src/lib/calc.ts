@@ -1,4 +1,4 @@
-import type { Invoice, InvoiceTotals, LineItem } from '@/types/invoice';
+import type { Invoice, InvoiceTotals, LineItem, TaxBreakupRow } from '@/types/invoice';
 import { amountToWordsINR } from './numberToWords';
 
 // --- Per-line derivations -------------------------------------------------
@@ -69,6 +69,49 @@ export function computeTotals(invoice: Invoice): InvoiceTotals {
     isIntraState: intra,
     amountInWords: amountToWordsINR(grandTotal),
   };
+}
+
+// --- HSN/SAC-wise tax breakup ---------------------------------------------
+
+/**
+ * Group line items by HSN/SAC + GST rate and split each group's tax into
+ * CGST/SGST (intra-state) or IGST (inter-state), as a GST tax invoice's tax
+ * summary requires. Returns an empty list for a bill of supply.
+ */
+export function computeTaxBreakup(invoice: Invoice): TaxBreakupRow[] {
+  if (invoice.invoiceType !== 'gst') return [];
+  const intra = isIntraState(invoice);
+  const groups = new Map<string, TaxBreakupRow>();
+
+  for (const item of invoice.items) {
+    const hsnSac = item.hsnSac.trim() || '—';
+    const rate = item.gstRate || 0;
+    const key = `${hsnSac}__${rate}`;
+    const taxable = lineTaxable(item);
+    const tax = lineTax(item, true);
+
+    const existing = groups.get(key) ?? {
+      hsnSac,
+      gstRate: rate,
+      taxableValue: 0,
+      cgst: 0,
+      sgst: 0,
+      igst: 0,
+    };
+
+    existing.taxableValue += taxable;
+    if (intra) {
+      existing.cgst += tax / 2;
+      existing.sgst += tax / 2;
+    } else {
+      existing.igst += tax;
+    }
+    groups.set(key, existing);
+  }
+
+  return [...groups.values()].sort(
+    (a, b) => a.hsnSac.localeCompare(b.hsnSac) || a.gstRate - b.gstRate,
+  );
 }
 
 // --- Formatting -----------------------------------------------------------

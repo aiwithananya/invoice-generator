@@ -29,6 +29,9 @@ No backend. No database. No sign-up. **Your invoice data never leaves your devic
   vector PDF in-memory and triggers a direct download. There is no upload step and no
   "download link" served from anywhere — the app makes **zero network requests** for
   your data.
+- **Image export is in-browser too.** "PNG" / "JPG" rasterise the on-screen invoice with
+  `html-to-image` (DOM → canvas → data URL) for easy sharing on WhatsApp — again, no
+  network. Files are auto-named `Invoice_<number>_<buyer>.<ext>`.
 
 ## Stack
 
