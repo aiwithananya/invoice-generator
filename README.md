@@ -25,7 +25,7 @@ on the right)._
   seller **logo** and **bank details**; a **Bill-to / Ship-to** toggle and an
   **Unregistered / B2C** option.
 - **Repeatable line items** — description, HSN/SAC, qty, unit, rate, discount %,
-  auto-calculated taxable value, and a 0/5/12/18/28 GST-rate picker.
+  auto-calculated taxable value, and a 0/3/5/12/18/28 GST-rate picker.
 - **Correct totals** — subtotal, discount, taxable value, an HSN-wise **tax summary
   table**, round-off, grand total, and **grand total in words** (Indian lakh/crore).
 - **Live preview** that recalculates on every keystroke and mirrors the printed layout.

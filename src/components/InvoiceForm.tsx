@@ -20,7 +20,7 @@ interface Props {
   onChange: (invoice: Invoice) => void;
 }
 
-const GST_RATES: GstRate[] = [0, 5, 12, 18, 28];
+const GST_RATES: GstRate[] = [0, 3, 5, 12, 18, 28];
 
 /** Parse a numeric input, treating empty as 0. */
 const num = (v: string): number => (v === '' ? 0 : Number(v));

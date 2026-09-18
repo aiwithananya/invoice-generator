@@ -42,7 +42,7 @@ export interface Buyer extends Party {
   shipTo: ShipTo;
 }
 
-export type GstRate = 0 | 5 | 12 | 18 | 28;
+export type GstRate = 0 | 3 | 5 | 12 | 18 | 28;
 
 export interface LineItem {
   id: string;
